@@ -1,13 +1,11 @@
 package ru.mail.polis.Kubrin;
 import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import org.jetbrains.annotations.NotNull;
 import ru.mail.polis.KVService;
 
 import java.io.*;
 import java.net.InetSocketAddress;
-import java.nio.file.Files;
 import java.util.NoSuchElementException;
 
 /**
