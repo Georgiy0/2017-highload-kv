@@ -20,7 +20,7 @@ import static org.junit.Assert.assertEquals;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class StartStopTest extends TestBase {
-    private static final long TIMEOUT_MS = TimeUnit.SECONDS.toMillis(1);
+    private static final long TIMEOUT_MS = TimeUnit.SECONDS.toMillis(2);
     private static int port;
     private static File data;
     private static KVService storage;
