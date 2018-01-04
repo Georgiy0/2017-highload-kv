@@ -48,6 +48,6 @@ final class KVServiceFactory {
             throw new IllegalArgumentException("Path is not a directory: " + data);
         }
 
-        return new KeyValueStorage(port, data);
+        return new KeyValueStorage(port, data, topology);
     }
 }

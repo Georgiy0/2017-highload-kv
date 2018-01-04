@@ -9,7 +9,7 @@ import java.util.NoSuchElementException;
  * Created by Egor on 09.10.2017.
  */
 public class DaoFiles implements Dao {
-    private static File directory;
+    private File directory;
 
     public DaoFiles(File directory) {
         this.directory = directory;

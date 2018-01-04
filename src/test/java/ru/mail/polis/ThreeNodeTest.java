@@ -24,7 +24,7 @@ import static org.junit.Assert.assertEquals;
  */
 public class ThreeNodeTest extends ClusterTestBase {
     @Rule
-    public final Timeout globalTimeout = Timeout.seconds(10);
+    public final Timeout globalTimeout = Timeout.seconds(15);
     private int port0;
     private int port1;
     private int port2;
