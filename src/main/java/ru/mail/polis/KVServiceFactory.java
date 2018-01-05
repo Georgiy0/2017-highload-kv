@@ -31,7 +31,8 @@ final class KVServiceFactory {
     static KVService create(
             final int port,
             @NotNull final File data,
-            @NotNull final Set<String> topology) throws IOException {
+            @NotNull final Set<String> topology,
+            @NotNull final String nodeAddressInTopology) throws IOException {
         if (Runtime.getRuntime().maxMemory() > MAX_HEAP) {
             throw new IllegalStateException("The heap is too big. Consider setting Xmx.");
         }
@@ -48,6 +49,6 @@ final class KVServiceFactory {
             throw new IllegalArgumentException("Path is not a directory: " + data);
         }
 
-        return new KeyValueStorage(port, data, topology);
+        return new KeyValueStorage(port, data, nodeAddressInTopology, topology);
     }
 }

@@ -22,6 +22,7 @@ public class KeyValueStorage implements KVService {
     private File valuesDirectory;
     private Set<String> clusterTopology;
     private int defaultAck, defaultFrom;
+    private int thisNodeNumInTopology;
     private int thisNode;
     private class GETresponse {
         public GETresponse(int code, byte[] data) {
@@ -34,12 +35,23 @@ public class KeyValueStorage implements KVService {
 
     public KeyValueStorage(final int port,
                            @NotNull final File data,
+                           @NotNull final String nodeAddressInTopology,
                            @NotNull final Set<String> topology) throws IOException {
         System.out.println(topology);
         // a hash set that keeps the information about the deleted entities.
         this.deleted = new HashSet<String>();
         this.valuesDirectory = data;
         this.clusterTopology = topology;
+        // determine the number of current node in the topology.
+        int temp = 0;
+        for(Iterator<String> it = clusterTopology.iterator(); it.hasNext();) {
+            String address = it.next();
+            if(address.equals(nodeAddressInTopology)) {
+                thisNodeNumInTopology = temp;
+                break;
+            }
+            temp++;
+        }
         // precomputed default values of ack and from for the given cluster topology
         // (dynamic changes to cluster topology are not implemented).
         defaultFrom = clusterTopology.size();
@@ -87,17 +99,7 @@ public class KeyValueStorage implements KVService {
             String requestID = parameterID.split("=")[1]; // get ID for the request
             if(requestMethod.equals("GET")) {
                 if(local) {
-                    if(deleted.contains(requestID))
-                        // response code 405 is used to indicate deleted entity in inter-cluster requests.
-                        sendHttpRespond(httpExchange, 405, "Value with key " + requestID + " was deleted!");
-                    else {
-                        try {
-                            byte[] dataGET = serverDao.getData(requestID);
-                            sendHttpRespond(httpExchange, 200, dataGET);
-                        } catch (NoSuchElementException e) {
-                            sendHttpRespond(httpExchange, 404, "Value with key " + requestID + " was not found!");
-                        }
-                    }
+                    localGET(httpExchange, requestID);
                 }
                 else {
                     int foundNum = 0;
@@ -108,18 +110,39 @@ public class KeyValueStorage implements KVService {
                     byte[] response = null;
                     GETresponse curResponse;
                     for (int i = 0; i < from; i++) {
-                        curResponse = sendHttpRequestGet(node, requestID);
-                        if (response == null)
-                            response = curResponse.data;
-                        if (curResponse.code == 404) {
-                            notFoundNum++;
-                            currentAck++;
-                        } else if (curResponse.code == 200) {
-                            foundNum++;
-                            currentAck++;
-                        } else if (curResponse.code == 405) {
-                            deletedNum++;
-                            currentAck++;
+                        if(node == thisNodeNumInTopology) {
+                            if(deleted.contains(requestID)) {
+                                // response code 405 is used to indicate deleted entity in inter-cluster requests.
+                                deletedNum++;
+                                currentAck++;
+                            }
+                            else {
+                                try {
+                                    byte[] dataGET = serverDao.getData(requestID);
+                                    if (response == null)
+                                        response = dataGET;
+                                    foundNum++;
+                                    currentAck++;
+                                } catch (NoSuchElementException e) {
+                                    notFoundNum++;
+                                    currentAck++;
+                                }
+                            }
+                        }
+                        else {
+                            curResponse = sendHttpRequestGet(node, requestID);
+                            if (response == null)
+                                response = curResponse.data;
+                            if (curResponse.code == 404) {
+                                notFoundNum++;
+                                currentAck++;
+                            } else if (curResponse.code == 200) {
+                                foundNum++;
+                                currentAck++;
+                            } else if (curResponse.code == 405) {
+                                deletedNum++;
+                                currentAck++;
+                            }
                         }
                         node = (node + 1) % clusterTopology.size();
                     }
@@ -137,15 +160,7 @@ public class KeyValueStorage implements KVService {
             }
             else if(requestMethod.equals("PUT")) {
                 if(local) {
-                    int dataSize = Integer.valueOf(httpExchange.getRequestHeaders().getFirst("Content-Length"));
-                    byte[] dataPUT = new byte[dataSize];
-                    int read = httpExchange.getRequestBody().read(dataPUT);
-                    if (read != dataPUT.length && read != -1) {
-                        throw new IOException("Can't read the file!");
-                    }
-                    serverDao.upsertData(requestID, dataPUT);
-                    deleted.remove(requestID); // the entity was upsert and we need to remove its id from the set of deleted.
-                    sendHttpRespond(httpExchange, 201, "Value was written with the key " + requestID + ".");
+                    localPUT(httpExchange, requestID);
                 }
                 else {
                     int dataSize = Integer.valueOf(httpExchange.getRequestHeaders().getFirst("Content-Length"));
@@ -157,7 +172,12 @@ public class KeyValueStorage implements KVService {
                     int node = hash(requestID);
                     int currentAck = 0;
                     for(int i = 0; i<from; i++) {
-                        if(sendHttpRequestPut(node, requestID, dataPUT) == 201)
+                        if(node == thisNodeNumInTopology) {
+                            serverDao.upsertData(requestID, dataPUT);
+                            deleted.remove(requestID); // the entity was upsert and we need to remove its id from the set of deleted.
+                            currentAck++;
+                        }
+                        else if(sendHttpRequestPut(node, requestID, dataPUT) == 201)
                             currentAck++;
                         node = (node + 1) % clusterTopology.size();
                     }
@@ -169,15 +189,18 @@ public class KeyValueStorage implements KVService {
             }
             else if(requestMethod.equals("DELETE")){
                 if(local) {
-                    serverDao.deleteData(requestID);
-                    deleted.add(requestID); // add id to the set of deleted entities.
-                    sendHttpRespond(httpExchange, 202, "Value with the key " + requestID + " was deleted.");
+                    localDELETE(httpExchange, requestID);
                 }
                 else {
                     int node = hash(requestID);
                     int currentAck = 0;
                     for(int i = 0; i<from; i++) {
-                        if(sendHttpRequestDelete(node, requestID) == 202)
+                        if(node == thisNodeNumInTopology) {
+                            serverDao.deleteData(requestID);
+                            deleted.add(requestID); // add id to the set of deleted entities.
+                            currentAck++;
+                        }
+                        else if(sendHttpRequestDelete(node, requestID) == 202)
                             currentAck++;
                         node = (node + 1) % clusterTopology.size();
                     }
@@ -334,5 +357,37 @@ public class KeyValueStorage implements KVService {
             i++;
         }
         return address;
+    }
+
+    private void localGET(HttpExchange httpExchange, String requestID) throws IOException {
+        if(deleted.contains(requestID))
+            // response code 405 is used to indicate deleted entity in inter-cluster requests.
+            sendHttpRespond(httpExchange, 405, "Value with key " + requestID + " was deleted!");
+        else {
+            try {
+                byte[] dataGET = serverDao.getData(requestID);
+                sendHttpRespond(httpExchange, 200, dataGET);
+            } catch (NoSuchElementException e) {
+                sendHttpRespond(httpExchange, 404, "Value with key " + requestID + " was not found!");
+            }
+        }
+    }
+
+    private void localPUT(HttpExchange httpExchange, String requestID) throws IOException {
+        int dataSize = Integer.valueOf(httpExchange.getRequestHeaders().getFirst("Content-Length"));
+        byte[] dataPUT = new byte[dataSize];
+        int read = httpExchange.getRequestBody().read(dataPUT);
+        if (read != dataPUT.length && read != -1) {
+            throw new IOException("Can't read the file!");
+        }
+        serverDao.upsertData(requestID, dataPUT);
+        deleted.remove(requestID); // the entity was upsert and we need to remove its id from the set of deleted.
+        sendHttpRespond(httpExchange, 201, "Value was written with the key " + requestID + ".");
+    }
+
+    private void localDELETE(HttpExchange httpExchange, String requestID) throws IOException {
+        serverDao.deleteData(requestID);
+        deleted.add(requestID); // add id to the set of deleted entities.
+        sendHttpRespond(httpExchange, 202, "Value with the key " + requestID + " was deleted.");
     }
 }

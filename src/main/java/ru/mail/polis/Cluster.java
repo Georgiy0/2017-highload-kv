@@ -32,7 +32,7 @@ public final class Cluster {
             System.out.println("Starting node " + i + " on port " + port + " and data at " + data);
 
             // Start the storage
-            final KVService storage = KVServiceFactory.create(port, data, topology);
+            final KVService storage = KVServiceFactory.create(port, data, topology, "http://localhost:"+PORTS[i]);
             storage.start();
             Runtime.getRuntime().addShutdownHook(new Thread(storage::stop));
         }
