@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
  * Created by Egor on 09.10.2017.
  */
 public class KeyValueStorage implements KVService {
+    private final int timeout = 500;
     private Set<String> deleted;
     private HttpServer server;
     private Dao serverDao;
@@ -34,6 +35,7 @@ public class KeyValueStorage implements KVService {
     public KeyValueStorage(final int port,
                            @NotNull final File data,
                            @NotNull final Set<String> topology) throws IOException {
+        System.out.println(topology);
         // a hash set that keeps the information about the deleted entities.
         this.deleted = new HashSet<String>();
         this.valuesDirectory = data;
@@ -229,7 +231,7 @@ public class KeyValueStorage implements KVService {
             connection.setRequestProperty("charset", "utf-8");
             connection.setDoOutput( true );
             connection.setUseCaches( false );
-            connection.setConnectTimeout(100);
+            connection.setConnectTimeout(timeout);
             connection.connect();
             int resCode = connection.getResponseCode();
             ByteArrayOutputStream buffer = null;
@@ -271,7 +273,7 @@ public class KeyValueStorage implements KVService {
             connection.setRequestProperty("charset", "utf-8");
             connection.setDoOutput( true );
             connection.setUseCaches( false );
-            connection.setConnectTimeout(100);
+            connection.setConnectTimeout(timeout);
             connection.getOutputStream().write(value);
             connection.getOutputStream().flush();
             connection.connect();
@@ -300,7 +302,7 @@ public class KeyValueStorage implements KVService {
             connection.setRequestProperty("charset", "utf-8");
             connection.setDoOutput( true );
             connection.setUseCaches( false );
-            connection.setConnectTimeout(100);
+            connection.setConnectTimeout(timeout);
             connection.connect();
             return connection.getResponseCode();
         }
