@@ -32,7 +32,7 @@ public final class Server {
                 KVServiceFactory.create(
                         PORT,
                         data,
-                        Collections.singleton("http://localhost:" + PORT));
+                        topology);
         storage.start();
         Runtime.getRuntime().addShutdownHook(new Thread(storage::stop));
     }
