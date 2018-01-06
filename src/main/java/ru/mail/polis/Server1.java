@@ -5,10 +5,10 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-public class Server3 {
+public final class Server1 {
     private static final int PORT = 8080;
 
-    private Server3() {
+    private Server1() {
         // Not instantiable
     }
 

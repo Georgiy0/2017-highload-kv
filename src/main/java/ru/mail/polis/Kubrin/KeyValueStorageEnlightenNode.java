@@ -1,26 +1,33 @@
 package ru.mail.polis.Kubrin;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.jetbrains.annotations.NotNull;
 import ru.mail.polis.KVService;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URL;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.concurrent.Executors;
 
-/**
- * Created by Egor on 09.10.2017.
- */
-public class KeyValueStorage implements KVService {
+public class KeyValueStorageEnlightenNode implements KVService {
     private final int timeout = 500;
     private Set<String> deleted;
     private HttpServer server;
     private Dao serverDao;
+    private File valuesDirectory;
     private Set<String> clusterTopology;
     private int defaultAck, defaultFrom;
+    private int thisNodeNumInTopology;
+    private int thisNode;
     private class GETresponse {
         public GETresponse(int code, byte[] data) {
             this.code = code;
@@ -30,13 +37,25 @@ public class KeyValueStorage implements KVService {
         public byte[] data;
     };
 
-    public KeyValueStorage(final int port,
+    public KeyValueStorageEnlightenNode(final int port,
                            @NotNull final File data,
+                           @NotNull final String nodeAddressInTopology,
                            @NotNull final Set<String> topology) throws IOException {
         System.out.println(topology);
         // a hash set that keeps the information about the deleted entities.
         this.deleted = new HashSet<String>();
+        this.valuesDirectory = data;
         this.clusterTopology = topology;
+        // determine the number of current node in the topology.
+        int temp = 0;
+        for(Iterator<String> it = clusterTopology.iterator(); it.hasNext();) {
+            String address = it.next();
+            if(address.equals(nodeAddressInTopology)) {
+                thisNodeNumInTopology = temp;
+                break;
+            }
+            temp++;
+        }
         // precomputed default values of ack and from for the given cluster topology
         // (dynamic changes to cluster topology are not implemented).
         defaultFrom = clusterTopology.size();
@@ -95,18 +114,39 @@ public class KeyValueStorage implements KVService {
                     byte[] response = null;
                     GETresponse curResponse;
                     for (int i = 0; i < from; i++) {
-                        curResponse = sendHttpRequestGet(node, requestID);
-                        if (response == null)
-                            response = curResponse.data;
-                        if (curResponse.code == 404) {
-                            notFoundNum++;
-                            currentAck++;
-                        } else if (curResponse.code == 200) {
-                            foundNum++;
-                            currentAck++;
-                        } else if (curResponse.code == 405) {
-                            deletedNum++;
-                            currentAck++;
+                        if(node == thisNodeNumInTopology) {
+                            if(deleted.contains(requestID)) {
+                                // response code 405 is used to indicate deleted entity in inter-cluster requests.
+                                deletedNum++;
+                                currentAck++;
+                            }
+                            else {
+                                try {
+                                    byte[] dataGET = serverDao.getData(requestID);
+                                    if (response == null)
+                                        response = dataGET;
+                                    foundNum++;
+                                    currentAck++;
+                                } catch (NoSuchElementException e) {
+                                    notFoundNum++;
+                                    currentAck++;
+                                }
+                            }
+                        }
+                        else {
+                            curResponse = sendHttpRequestGet(node, requestID);
+                            if (response == null)
+                                response = curResponse.data;
+                            if (curResponse.code == 404) {
+                                notFoundNum++;
+                                currentAck++;
+                            } else if (curResponse.code == 200) {
+                                foundNum++;
+                                currentAck++;
+                            } else if (curResponse.code == 405) {
+                                deletedNum++;
+                                currentAck++;
+                            }
                         }
                         node = (node + 1) % clusterTopology.size();
                     }
@@ -136,7 +176,12 @@ public class KeyValueStorage implements KVService {
                     int node = hash(requestID);
                     int currentAck = 0;
                     for(int i = 0; i<from; i++) {
-                        if(sendHttpRequestPut(node, requestID, dataPUT) == 201)
+                        if(node == thisNodeNumInTopology) {
+                            serverDao.upsertData(requestID, dataPUT);
+                            deleted.remove(requestID); // the entity was upsert and we need to remove its id from the set of deleted.
+                            currentAck++;
+                        }
+                        else if(sendHttpRequestPut(node, requestID, dataPUT) == 201)
                             currentAck++;
                         node = (node + 1) % clusterTopology.size();
                     }
@@ -154,7 +199,12 @@ public class KeyValueStorage implements KVService {
                     int node = hash(requestID);
                     int currentAck = 0;
                     for(int i = 0; i<from; i++) {
-                        if(sendHttpRequestDelete(node, requestID) == 202)
+                        if(node == thisNodeNumInTopology) {
+                            serverDao.deleteData(requestID);
+                            deleted.add(requestID); // add id to the set of deleted entities.
+                            currentAck++;
+                        }
+                        else if(sendHttpRequestDelete(node, requestID) == 202)
                             currentAck++;
                         node = (node + 1) % clusterTopology.size();
                     }

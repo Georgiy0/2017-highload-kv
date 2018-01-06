@@ -5,10 +5,10 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-public class Server3 {
+public final class ServerEnlighten2 {
     private static final int PORT = 8080;
 
-    private Server3() {
+    private ServerEnlighten2() {
         // Not instantiable
     }
 
@@ -23,11 +23,13 @@ public class Server3 {
 
         // Start the storage
         final KVService storage =
-                KVServiceFactory.create(
+                KVServiceFactory.createEnlighten(
                         PORT,
                         data,
-                        topology);
+                        topology,
+                        "http://10.213.154.185:8080");
         storage.start();
         Runtime.getRuntime().addShutdownHook(new Thread(storage::stop));
     }
 }
+

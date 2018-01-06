@@ -2,19 +2,13 @@ package ru.mail.polis;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * Starts storage and waits for shutdown
- *
- * @author Vadim Tsesko <mail@incubos.org>
- */
-public final class Server {
+public final class ServerEnlighten3 {
     private static final int PORT = 8080;
 
-    private Server() {
+    private ServerEnlighten3() {
         // Not instantiable
     }
 
@@ -29,11 +23,11 @@ public final class Server {
 
         // Start the storage
         final KVService storage =
-                KVServiceFactory.create(
+                KVServiceFactory.createEnlighten(
                         PORT,
                         data,
                         topology,
-                        "http://10.213.154.1:8080");
+                        "http://10.213.154.206:8080");
         storage.start();
         Runtime.getRuntime().addShutdownHook(new Thread(storage::stop));
     }

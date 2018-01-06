@@ -2,6 +2,7 @@ package ru.mail.polis;
 
 import org.jetbrains.annotations.NotNull;
 import ru.mail.polis.Kubrin.KeyValueStorage;
+import ru.mail.polis.Kubrin.KeyValueStorageEnlightenNode;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,6 +32,30 @@ final class KVServiceFactory {
     static KVService create(
             final int port,
             @NotNull final File data,
+            @NotNull final Set<String> topology) throws IOException {
+        if (Runtime.getRuntime().maxMemory() > MAX_HEAP) {
+            throw new IllegalStateException("The heap is too big. Consider setting Xmx.");
+        }
+
+        if (port <= 0 || 65536 <= port) {
+            throw new IllegalArgumentException("Port out of range");
+        }
+
+        if (!data.exists()) {
+            throw new IllegalArgumentException("Path doesn't exist: " + data);
+        }
+
+        if (!data.isDirectory()) {
+            throw new IllegalArgumentException("Path is not a directory: " + data);
+        }
+
+        return new KeyValueStorage(port, data, topology);
+    }
+
+    @NotNull
+    static KVService createEnlighten(
+            final int port,
+            @NotNull final File data,
             @NotNull final Set<String> topology,
             @NotNull final String nodeAddressInTopology) throws IOException {
         if (Runtime.getRuntime().maxMemory() > MAX_HEAP) {
@@ -49,6 +74,6 @@ final class KVServiceFactory {
             throw new IllegalArgumentException("Path is not a directory: " + data);
         }
 
-        return new KeyValueStorage(port, data, nodeAddressInTopology, topology);
+        return new KeyValueStorageEnlightenNode(port, data, nodeAddressInTopology, topology);
     }
 }

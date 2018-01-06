@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-public final class Server2 {
+public class Server2 {
     private static final int PORT = 8080;
 
     private Server2() {
@@ -26,10 +26,8 @@ public final class Server2 {
                 KVServiceFactory.create(
                         PORT,
                         data,
-                        topology,
-                        "http://10.213.154.185:8080");
+                        topology);
         storage.start();
         Runtime.getRuntime().addShutdownHook(new Thread(storage::stop));
     }
 }
-
