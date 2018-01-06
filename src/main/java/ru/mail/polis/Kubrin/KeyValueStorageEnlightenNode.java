@@ -77,14 +77,16 @@ public class KeyValueStorageEnlightenNode implements KVService {
             boolean local = false;
             // parse replicas and local request parameters.
             if(requestParameter.contains("&")) {
-                String params[] = requestParameter.split("&");
-                parameterID = params[0];
-                parameterReplicas = params[1];
-                if(parameterReplicas.split("=").length != 1 && parameterReplicas.split("=")[0].equals("replicas")) { // check replicas
-                    parameterReplicas = parameterReplicas.split("=")[1];
+                String[] parameterReplicasSplit = requestParameter.split("&");
+                parameterID = parameterReplicasSplit[0];
+                parameterReplicas = parameterReplicasSplit[1];
+                parameterReplicasSplit = parameterReplicas.split("=");
+                if(parameterReplicasSplit.length != 1 && parameterReplicasSplit[0].equals("replicas")) { // check replicas
+                    parameterReplicas = parameterReplicasSplit[1];
                     if(parameterReplicas.contains("/")){
-                        ack = Integer.parseInt(parameterReplicas.split("/")[0]);
-                        from = Integer.parseInt(parameterReplicas.split("/")[1]);
+                        parameterReplicasSplit = parameterReplicas.split("/");
+                        ack = Integer.parseInt(parameterReplicasSplit[0]);
+                        from = Integer.parseInt(parameterReplicasSplit[1]);
                         if(ack < 1 || ack > from) // validate ack and from values.
                             sendHttpRespond(httpExchange, 400, "Invalid ack value.");
                     }
@@ -95,12 +97,13 @@ public class KeyValueStorageEnlightenNode implements KVService {
             }
 
             // validate id parameter.
-            if(parameterID.split("=").length == 1 || !parameterID.split("=")[0].equals("id")) {
+            String[] parameterIDSplit = parameterID.split("=");
+            if(parameterIDSplit.length == 1 || !parameterIDSplit[0].equals("id")) {
                 sendHttpRespond(httpExchange, 400, "No ID specified.");
                 return;
             }
 
-            String requestID = parameterID.split("=")[1]; // get ID for the request
+            String requestID = parameterIDSplit[1]; // get ID for the request
             if(requestMethod.equals("GET")) {
                 if(local) {
                     localGET(httpExchange, requestID);
