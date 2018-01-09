@@ -402,6 +402,87 @@ Requests/sec:     75.44
 Transfer/sec:      6.18KB
 ```
 
+## Нагрузочное тестирование Yandex-Tank
+
+Для оптимизированного варианта хранилища (см. ниже, секция "Оптимизация") было проведено нагрузочное тестирование с помощью пакета Yandex-Tank с генератором нагрузки Phantom. Набор патрон для генератора был создан с помощью Python скрипта:
+```
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import sys
+
+def make_ammo(method, url, headers, case, body):
+    """ makes phantom ammo """
+    #http request w/o entity body template
+    req_template = (
+          "%s %s HTTP/1.1\r\n"
+          "%s\r\n"
+          "\r\n"
+    )
+
+    #http request with entity body template
+    req_template_w_entity_body = (
+          "%s %s HTTP/1.1\r\n"
+          "%s\r\n"
+          "Content-Length: %d\r\n"
+          "\r\n"
+          "%s\r\n"
+    )
+
+    if not body:
+        req = req_template % (method, url, headers)
+    else:
+        req = req_template_w_entity_body % (method, url, headers, len(body), body)
+
+    #phantom ammo template
+    ammo_template = (
+        "%d %s\n"
+        "%s"
+    )
+
+    return ammo_template % (len(req), case, req)
+
+def main():
+    headers_GET = "Host: localhost:8080\r\n" + \
+            "User-Agent: tank\r\n" + \
+            "Accept: */*\r\n" + \
+            "Connection: Close"
+
+    f = open("ammo.txt", "w")
+    for i in range(1, 10001):
+        
+
+	url = "/v0/entity?id=key{}".format(i)
+	case = "get_{}".format(i)
+        f.write(make_ammo("GET", url, headers_GET, case, ""))
+	body = "value{}".format(i)
+        case = "put_{}".format(i)
+	headers_PUT = "Host: localhost:8080\r\n" + \
+	    "Content-Length: {}\r\n".format(len(body)) + \
+            "User-Agent: tank\r\n" + \
+            "Accept: */*\r\n" + \
+            "Connection: Close"
+	f.write(make_ammo("PUT", url, headers_PUT, case, body))
+	f.write("\r\n")
+    f.close();
+
+if __name__ == "__main__":
+    main()
+```yan
+
+Для тестирования использовалась то же тестовое окружение, что и раньше (три узла: один на виртуальной машине, два в контейнерах на этой же виртуальной машине).
+
+К инсталяции yandex tank версии 1.9 не удалось подключить плагин для онлайн отрисовки статистики (yandex-online). Результаты анализировались по онлайн консольному выводу, также были изучены созданный Phantom файлы с отчётами. Было проведено два теста, перед тестами хранилище было заполнено 10 000 entities, на которые проводились запросы:
+
+### 1 - 1000 RPS за две минуты
+Данный тест прошёл успешно. Результаты привидены в репозитории, в папке yandex-tank/tank_tests/1.
+
+### 2 - 1000 - 10 000 RPS за две минуты
+Данный тест завершился не успешно, поскольку не хватило ОП на тестовой виртуальной машине для обеспечения работы yandex-tank. Yandex-tank прекратил работу, выдав максимально 422 RPS. Виртуальной машине было выделено 4 ГБ оперативной памяти. Перед отключением yandex-tank показывал, что время ответа кластера в среднем превышало две секунды. Результаты тестирования приведены в папке yandex-tank/tank_tests/2.
+
+Ниже приведён скриншот тестовой ВМ во время работы yandex-tank:
+<img src="screenshots/testing_with_yandex_tank.png">
+
 # Профилирование
 
 Для профилирования использовался async-profiler, который подключался к java машине, запущенной на виртуальной машине. На время профилирование (30 секунд) на кластер подавалась нагрузка из смешанных PUT и GET запросов с помощью ранее реализованного lua скрипта и утириты wrk. Результаты профилирования были сохранены в файл и преобразованы в график с помощью скрипта flamegrahp.pl (https://github.com/BrendanGregg/FlameGraph).
