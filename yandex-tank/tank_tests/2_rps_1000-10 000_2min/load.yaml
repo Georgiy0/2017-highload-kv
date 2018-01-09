@@ -1,0 +1,8 @@
+phantom:
+  address: 127.0.0.1:8080 # [Target's address]:[target's port]
+  ammofile: ammo.txt
+  load_profile:
+    load_type: rps
+    schedule: line(1000, 10000, 2m)
+telegraf:
+  enabled: true

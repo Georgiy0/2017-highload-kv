@@ -1,0 +1,8 @@
+phantom:
+  address: 127.0.0.1:8080 # [Target's address]:[target's port]
+  ammofile: ammo.txt
+  load_profile:
+    load_type: rps # schedule load by defining requests per second
+    schedule: line(1, 1000, 2m) # starting from 1rps growing linearly to 10rps during 10 minutes
+telegraf:
+  enabled: true # let's disable telegraf monitoring for this time
